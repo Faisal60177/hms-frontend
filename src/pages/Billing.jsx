@@ -4,83 +4,120 @@ import API from '../api/axiosConfig';
 export default function Billing() {
     const [bills,  setBills]  = useState([]);
     const [filter, setFilter] = useState('All');
+    const [msg,    setMsg]    = useState('');
 
     const load = async () => {
-        const url = filter === 'Pending' ? '/billing/pending' : '/billing';
-        const res = await API.get(url);
+        const res = await API.get('/billing');
         setBills(res.data);
     };
 
-    useEffect(() => { load(); }, [filter]);
+    useEffect(() => { load(); }, []);
 
     const markPaid = async (id) => {
         await API.patch(`/billing/${id}/pay`);
+        setMsg('✅ Bill marked as paid.');
         load();
     };
 
-    const th = { background:'#1F3864', color:'white', padding:'10px 12px', textAlign:'left' };
-    const td = { padding:'8px 12px', borderBottom:'1px solid #ddd' };
+    const filtered = filter === 'All'
+        ? bills
+        : bills.filter(b => b.paymentStatus === filter);
 
-    const statusColor = s =>
-        s==='Paid' ? '#43a047' : s==='Pending' ? '#e53935' : '#FB8C00';
+    const totalRevenue  = bills.reduce((s, b) => s + (b.totalAmount || 0), 0);
+    const totalCollected = bills.filter(b => b.paymentStatus === 'Paid')
+        .reduce((s, b) => s + (b.totalAmount || 0), 0);
+    const totalPending  = bills.filter(b => b.paymentStatus !== 'Paid')
+        .reduce((s, b) => s + (b.totalAmount || 0), 0);
 
     return (
-        <div>
-            <h2 style={{ color:'#1F3864' }}>Billing Records</h2>
+        <div className="page-wrapper">
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Billing & Payments</h1>
+                    <p className="page-subtitle">{bills.length} total billing records</p>
+                </div>
+            </div>
 
-            <div style={{ marginBottom:16, display:'flex', gap:8 }}>
-                {['All','Pending'].map(f => (
+            {msg && (
+                <div className="alert alert-success">{msg}</div>
+            )}
+
+            {/* Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
+                {[
+                    { label: 'Total Billed',   value: totalRevenue,   color: '#1d4ed8', bg: '#eff6ff' },
+                    { label: 'Collected',      value: totalCollected, color: '#15803d', bg: '#f0fdf4' },
+                    { label: 'Pending',        value: totalPending,   color: '#dc2626', bg: '#fef2f2' },
+                ].map(s => (
+                    <div key={s.label} className="card" style={{ background: s.bg, border: 'none' }}>
+                        <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 600 }}>{s.label}</div>
+                        <div style={{ fontSize: 26, fontWeight: 800, color: s.color, marginTop: 6 }}>
+                            ৳{s.value.toLocaleString()}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Filter */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                {['All', 'Paid', 'Pending', 'Partial'].map(f => (
                     <button key={f} onClick={() => setFilter(f)}
-                            style={{ padding:'8px 16px', border:'none', borderRadius:4,
-                                cursor:'pointer',
-                                background: filter===f ? '#2E5496':'#ddd',
-                                color: filter===f ? 'white':'#333' }}>
-                        {f} Bills
+                            className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-outline'}`}>
+                        {f} ({f === 'All' ? bills.length : bills.filter(b => b.paymentStatus === f).length})
                     </button>
                 ))}
             </div>
 
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead>
-                <tr>
-                    {['Bill ID','Patient','Date','Consult','Medicine',
-                        'Tests','Bed','Total','Status','Action'].map(h =>
-                        <th key={h} style={th}>{h}</th>
-                    )}
-                </tr>
-                </thead>
-                <tbody>
-                {bills.map((b, i) => (
-                    <tr key={b.billId} style={{ background: i%2===0 ? '#f9f9f9':'white' }}>
-                        <td style={td}>{b.billId}</td>
-                        <td style={td}>{b.patient?.fullName}</td>
-                        <td style={td}>{b.billDate}</td>
-                        <td style={td}>৳{b.consultationFee}</td>
-                        <td style={td}>৳{b.medicineCost}</td>
-                        <td style={td}>৳{b.testCharges}</td>
-                        <td style={td}>৳{b.bedCharges}</td>
-                        <td style={{ ...td, fontWeight:'bold' }}>৳{b.totalAmount}</td>
-                        <td style={td}>
-                <span style={{ background: statusColor(b.paymentStatus),
-                    color:'white', padding:'2px 8px',
-                    borderRadius:12, fontSize:12 }}>
-                  {b.paymentStatus}
-                </span>
-                        </td>
-                        <td style={td}>
-                            {b.paymentStatus !== 'Paid' && (
-                                <button onClick={() => markPaid(b.billId)}
-                                        style={{ background:'#1F7A4D', color:'white',
-                                            border:'none', padding:'4px 10px',
-                                            borderRadius:4, cursor:'pointer' }}>
-                                    Mark Paid
-                                </button>
-                            )}
-                        </td>
+            {/* Table */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table className="data-table">
+                    <thead>
+                    <tr>
+                        <th>Bill #</th><th>Patient</th><th>Date</th>
+                        <th>Consult</th><th>Medicine</th><th>Tests</th>
+                        <th>Bed</th><th>Total</th><th>Status</th><th>Action</th>
                     </tr>
-                ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                    {filtered.map(b => (
+                        <tr key={b.billId}>
+                            <td style={{ color: '#9ca3af', fontSize: 12 }}>#{b.billId}</td>
+                            <td style={{ fontWeight: 600 }}>{b.patient?.fullName}</td>
+                            <td style={{ color: '#6b7280', fontSize: 13 }}>{b.billDate}</td>
+                            <td>৳{b.consultationFee}</td>
+                            <td>৳{b.medicineCost}</td>
+                            <td>৳{b.testCharges}</td>
+                            <td>৳{b.bedCharges}</td>
+                            <td style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e' }}>
+                                ৳{b.totalAmount?.toLocaleString()}
+                            </td>
+                            <td>
+                  <span className={`badge ${
+                      b.paymentStatus === 'Paid'    ? 'badge-success' :
+                          b.paymentStatus === 'Pending' ? 'badge-danger'  : 'badge-warning'
+                  }`}>
+                    {b.paymentStatus}
+                  </span>
+                            </td>
+                            <td>
+                                {b.paymentStatus !== 'Paid' && (
+                                    <button className="btn btn-success btn-sm"
+                                            onClick={() => markPaid(b.billId)}>
+                                        ✓ Mark Paid
+                                    </button>
+                                )}
+                            </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+                {filtered.length === 0 && (
+                    <div className="empty-state">
+                        <div className="empty-state-icon">💳</div>
+                        <p>No billing records found.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

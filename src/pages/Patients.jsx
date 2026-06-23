@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import API from '../api/axiosConfig';
 
 export default function Patients() {
     const [patients, setPatients] = useState([]);
     const [search,   setSearch]   = useState('');
     const [loading,  setLoading]  = useState(true);
+    const [filter,   setFilter]   = useState('All');
 
     const load = async () => {
         setLoading(true);
@@ -22,64 +24,134 @@ export default function Patients() {
         load();
     };
 
-    const th = { background:'#1F3864', color:'white', padding:'10px 12px', textAlign:'left' };
-    const td = { padding:'8px 12px', borderBottom:'1px solid #ddd' };
+    const filtered = filter === 'All'
+        ? patients
+        : patients.filter(p => p.patientType === filter);
 
     return (
-        <div>
-            <h2 style={{ color:'#1F3864' }}>Patient List</h2>
-
-            <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                <input value={search} onChange={e => setSearch(e.target.value)}
-                       placeholder="Search by name..." style={inp} />
-                <button onClick={load} style={btn}>Search</button>
-                <button onClick={() => { setSearch(''); load(); }} style={{ ...btn, background:'#666' }}>
-                    Clear
-                </button>
+        <div className="page-wrapper">
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Patient Management</h1>
+                    <p className="page-subtitle">{patients.length} total patients registered</p>
+                </div>
+                <Link to="/patients/add">
+                    <button className="btn btn-primary">➕ Register Patient</button>
+                </Link>
             </div>
 
-            {loading ? <p>Loading...</p> : (
-                <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                    <thead>
-                    <tr>
-                        {['ID','Name','Age','Gender','Blood','Phone','Type','Admitted','Action'].map(h =>
-                            <th key={h} style={th}>{h}</th>
-                        )}
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {patients.map((p, i) => (
-                        <tr key={p.patientId} style={{ background: i%2===0 ? '#f9f9f9':'white' }}>
-                            <td style={td}>{p.patientId}</td>
-                            <td style={td}>{p.fullName}</td>
-                            <td style={td}>{p.age}</td>
-                            <td style={td}>{p.gender}</td>
-                            <td style={td}>{p.bloodGroup}</td>
-                            <td style={td}>{p.phone}</td>
-                            <td style={td}>
-                  <span style={{
-                      background: p.patientType==='IPD' ? '#e53935':'#43a047',
-                      color:'white', padding:'2px 8px', borderRadius:12, fontSize:12
-                  }}>{p.patientType}</span>
-                            </td>
-                            <td style={td}>{p.admissionDate}</td>
-                            <td style={td}>
-                                <button onClick={() => deletePatient(p.patientId)}
-                                        style={{ background:'#e53935', color:'white',
-                                            border:'none', padding:'4px 10px',
-                                            borderRadius:4, cursor:'pointer' }}>
-                                    Delete
-                                </button>
-                            </td>
+            {/* Filters + Search */}
+            <div className="card card-sm" style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between', gap: 16 }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        {['All', 'OPD', 'IPD'].map(f => (
+                            <button key={f} onClick={() => setFilter(f)}
+                                    className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-outline'}`}>
+                                {f} {f !== 'All' && (
+                                <span style={{ marginLeft: 4 }}>
+                    ({patients.filter(p => p.patientType === f).length})
+                  </span>
+                            )}
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                        <div className="search-bar">
+                            <span>🔍</span>
+                            <input placeholder="Search patients..."
+                                   value={search}
+                                   onChange={e => setSearch(e.target.value)}
+                                   onKeyDown={e => e.key === 'Enter' && load()} />
+                        </div>
+                        <button className="btn btn-outline" onClick={load}>Search</button>
+                        <button className="btn btn-outline btn-sm"
+                                onClick={() => { setSearch(''); setFilter('All'); load(); }}>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Table */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                {loading ? (
+                    <div style={{ padding: 48, textAlign: 'center', color: '#9ca3af' }}>
+                        Loading patients...
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div className="empty-state">
+                        <div className="empty-state-icon">👥</div>
+                        <p>No patients found.</p>
+                    </div>
+                ) : (
+                    <table className="data-table">
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Patient</th>
+                            <th>Age / Gender</th>
+                            <th>Blood</th>
+                            <th>Phone</th>
+                            <th>Address</th>
+                            <th>Type</th>
+                            <th>Admitted</th>
+                            <th>Action</th>
                         </tr>
-                    ))}
-                    </tbody>
-                </table>
-            )}
+                        </thead>
+                        <tbody>
+                        {filtered.map(p => (
+                            <tr key={p.patientId}>
+                                <td style={{ color: '#9ca3af', fontSize: 12 }}>#{p.patientId}</td>
+                                <td>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <div style={{
+                                            width: 34, height: 34, borderRadius: '50%',
+                                            background: '#dbeafe', color: '#1d4ed8',
+                                            display: 'flex', alignItems: 'center',
+                                            justifyContent: 'center', fontWeight: 700, fontSize: 13,
+                                            flexShrink: 0,
+                                        }}>
+                                            {p.fullName?.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, fontSize: 14 }}>{p.fullName}</div>
+                                            <div style={{ fontSize: 12, color: '#9ca3af' }}>{p.address}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{p.age}y / {p.gender}</td>
+                                <td>
+                    <span className="tag" style={{
+                        background: '#fef9c3', color: '#854d0e', fontSize: 12
+                    }}>{p.bloodGroup}</span>
+                                </td>
+                                <td style={{ fontFamily: 'monospace', fontSize: 13 }}>{p.phone}</td>
+                                <td style={{ color: '#6b7280' }}>{p.address}</td>
+                                <td>
+                    <span className={`badge ${p.patientType === 'IPD' ? 'badge-danger' : 'badge-info'}`}>
+                      {p.patientType}
+                    </span>
+                                </td>
+                                <td style={{ color: '#6b7280', fontSize: 13 }}>{p.admissionDate}</td>
+                                <td>
+                                    <button className="btn btn-danger btn-sm"
+                                            onClick={() => deletePatient(p.patientId)}>
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                )}
+                {filtered.length > 0 && (
+                    <div style={{ padding: '12px 16px', borderTop: '1px solid #f3f4f6',
+                        fontSize: 13, color: '#6b7280', background: '#f8fafc' }}>
+                        Showing {filtered.length} of {patients.length} patients
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
-
-const inp = { padding:8, border:'1px solid #ccc', borderRadius:4, width:250 };
-const btn = { padding:'8px 16px', background:'#2E5496', color:'white',
-    border:'none', borderRadius:4, cursor:'pointer' };
